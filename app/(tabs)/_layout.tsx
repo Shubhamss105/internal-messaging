@@ -5,10 +5,11 @@ import {
   MessageSquare, 
   FileText, 
   User, 
-  LogOut
+  LogOut,
+  PlusCircle
 } from "lucide-react-native";
 import React from "react";
-import { Alert, TouchableOpacity } from "react-native";
+import { Alert, TouchableOpacity, StyleSheet, View } from "react-native";
 import { useAuth } from "@/contexts/auth-context";
 import { colors } from "@/constants/colors";
 
@@ -34,6 +35,10 @@ export default function TabLayout() {
         },
       ]
     );
+  };
+
+  const handleNewComplaint = () => {
+    router.push("/complaints/new");
   };
   
   return (
@@ -64,6 +69,16 @@ export default function TabLayout() {
         options={{
           title: "Complaints",
           tabBarIcon: ({ color }) => <FileText size={22} color={color} />,
+          headerRight: () => (
+            <View style={styles.headerRightContainer}>
+              <TouchableOpacity onPress={handleNewComplaint} style={styles.newComplaintButton}>
+                <PlusCircle size={22} color={colors.primary} />
+              </TouchableOpacity>
+              <TouchableOpacity onPress={handleLogout} style={{ marginRight: 16 }}>
+                <LogOut size={22} color={colors.text} />
+              </TouchableOpacity>
+            </View>
+          ),
         }}
       />
       <Tabs.Screen
@@ -90,3 +105,13 @@ export default function TabLayout() {
     </Tabs>
   );
 }
+
+const styles = StyleSheet.create({
+  headerRightContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  newComplaintButton: {
+    marginRight: 16,
+  },
+});

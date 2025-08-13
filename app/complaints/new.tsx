@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Alert,
   KeyboardAvoidingView,
@@ -19,7 +19,14 @@ import { useAuth } from "@/contexts/auth-context";
 import { colors } from "@/constants/colors";
 import Button from "@/components/Button";
 import Input from "@/components/Input";
-import { mockCategories, mockUsers } from "@/mocks/data";
+import { User } from "@/types";
+
+const CATEGORIES = [
+  { id: "workplace", name: "Workplace Issue" },
+  { id: "hr", name: "HR Issue" },
+  { id: "equipment", name: "Equipment Issue" },
+  { id: "other", name: "Other" },
+];
 
 export default function NewComplaintScreen() {
   const [title, setTitle] = useState("");
@@ -29,11 +36,28 @@ export default function NewComplaintScreen() {
   const [taggedUsers, setTaggedUsers] = useState<string[]>([]);
   const [image, setImage] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  
+  const [users, setUsers] = useState<User[]>([]);
+
   const { submitComplaint } = useComplaints();
-  const { user } = useAuth();
+  const { user, getAllUsers } = useAuth();
   const router = useRouter();
-  
+
+  useEffect(() => {
+    const fetchUsers = async () => {
+      try {
+        const allUsers = await getAllUsers();
+        setUsers(allUsers.filter((u) => u.id !== user?.id));
+      } catch (error) {
+        console.error("Failed to fetch users:", error);
+        Alert.alert("Error", "Failed to load users for tagging");
+      }
+    };
+
+    if (user) {
+      fetchUsers();
+    }
+  }, [user]);
+
   const handlePickImage = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
@@ -41,32 +65,35 @@ export default function NewComplaintScreen() {
       aspect: [4, 3],
       quality: 0.8,
     });
-    
+
     if (!result.canceled) {
       setImage(result.assets[0].uri);
     }
   };
-  
+
   const handleRemoveImage = () => {
     setImage(null);
   };
-  
+
   const handleToggleUserTag = (userId: string) => {
     if (taggedUsers.includes(userId)) {
-      setTaggedUsers(taggedUsers.filter(id => id !== userId));
+      setTaggedUsers(taggedUsers.filter((id) => id !== userId));
     } else {
       setTaggedUsers([...taggedUsers, userId]);
     }
   };
-  
+
   const handleSubmit = async () => {
     if (!title.trim() || !description.trim() || !category) {
       Alert.alert("Error", "Please fill in all required fields");
       return;
     }
-    
-    if (!user) return;
-    
+
+    if (!user) {
+      Alert.alert("Error", "User not authenticated");
+      return;
+    }
+
     setIsSubmitting(true);
     try {
       const newComplaint = await submitComplaint({
@@ -78,21 +105,21 @@ export default function NewComplaintScreen() {
         submitterId: user.id,
         taggedUsers,
       });
-      
+
       Alert.alert("Success", "Complaint submitted successfully", [
         {
           text: "OK",
           onPress: () => router.back(),
         },
       ]);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to submit complaint:", error);
-      Alert.alert("Error", "Failed to submit complaint");
+      Alert.alert("Error", `Failed to submit complaint: ${error.message}`);
     } finally {
       setIsSubmitting(false);
     }
   };
-  
+
   return (
     <KeyboardAvoidingView
       style={styles.container}
@@ -108,10 +135,10 @@ export default function NewComplaintScreen() {
             onChangeText={setTitle}
             testID="title-input"
           />
-          
+
           <Text style={styles.label}>Category *</Text>
           <View style={styles.categoriesContainer}>
-            {mockCategories.map(cat => (
+            {CATEGORIES.map((cat) => (
               <TouchableOpacity
                 key={cat.id}
                 style={[
@@ -131,7 +158,7 @@ export default function NewComplaintScreen() {
               </TouchableOpacity>
             ))}
           </View>
-          
+
           <Input
             label="Description *"
             placeholder="Describe your complaint in detail"
@@ -142,7 +169,7 @@ export default function NewComplaintScreen() {
             style={styles.descriptionInput}
             testID="description-input"
           />
-          
+
           <View style={styles.attachmentsContainer}>
             <Text style={styles.label}>Attachments</Text>
             <View style={styles.attachmentButtons}>
@@ -153,13 +180,13 @@ export default function NewComplaintScreen() {
                 <Camera size={20} color={colors.primary} />
                 <Text style={styles.attachmentButtonText}>Add Image</Text>
               </TouchableOpacity>
-              
+
               <TouchableOpacity style={styles.attachmentButton}>
                 <Mic size={20} color={colors.primary} />
                 <Text style={styles.attachmentButtonText}>Add Audio</Text>
               </TouchableOpacity>
             </View>
-            
+
             {image && (
               <View style={styles.imagePreviewContainer}>
                 <Image source={{ uri: image }} style={styles.imagePreview} />
@@ -172,45 +199,43 @@ export default function NewComplaintScreen() {
               </View>
             )}
           </View>
-          
+
           <View style={styles.taggedUsersContainer}>
             <Text style={styles.label}>Tag Users</Text>
             <Text style={styles.taggedUsersDescription}>
               Tag users who should be notified about this complaint
             </Text>
-            
+
             <View style={styles.usersList}>
-              {mockUsers
-                .filter(u => u.id !== user?.id)
-                .map(u => (
-                  <TouchableOpacity
-                    key={u.id}
+              {users.map((u) => (
+                <TouchableOpacity
+                  key={u.id}
+                  style={[
+                    styles.userItem,
+                    taggedUsers.includes(u.id) && styles.userItemSelected,
+                  ]}
+                  onPress={() => handleToggleUserTag(u.id)}
+                >
+                  {u.avatar ? (
+                    <Image source={{ uri: u.avatar }} style={styles.userAvatar} />
+                  ) : (
+                    <View style={styles.userAvatarPlaceholder}>
+                      <Text style={styles.userAvatarText}>{u.name.charAt(0)}</Text>
+                    </View>
+                  )}
+                  <Text
                     style={[
-                      styles.userItem,
-                      taggedUsers.includes(u.id) && styles.userItemSelected,
+                      styles.userName,
+                      taggedUsers.includes(u.id) && styles.userNameSelected,
                     ]}
-                    onPress={() => handleToggleUserTag(u.id)}
                   >
-                    {u.avatar ? (
-                      <Image source={{ uri: u.avatar }} style={styles.userAvatar} />
-                    ) : (
-                      <View style={styles.userAvatarPlaceholder}>
-                        <Text style={styles.userAvatarText}>{u.name.charAt(0)}</Text>
-                      </View>
-                    )}
-                    <Text
-                      style={[
-                        styles.userName,
-                        taggedUsers.includes(u.id) && styles.userNameSelected,
-                      ]}
-                    >
-                      {u.name}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
+                    {u.name}
+                  </Text>
+                </TouchableOpacity>
+              ))}
             </View>
           </View>
-          
+
           <View style={styles.anonymousContainer}>
             <View>
               <Text style={styles.label}>Submit Anonymously</Text>
@@ -226,7 +251,7 @@ export default function NewComplaintScreen() {
               testID="anonymous-switch"
             />
           </View>
-          
+
           <Button
             title="Submit Complaint"
             onPress={handleSubmit}
